@@ -45,7 +45,7 @@ Before you begin, ensure you have the following installed:
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone git@github.com:tareqsifat/klassy_missy_code_assesment.git
 cd coding_assesment_klassy_missy
 ```
 
