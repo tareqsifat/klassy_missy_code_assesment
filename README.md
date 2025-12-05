@@ -46,7 +46,7 @@ Before you begin, ensure you have the following installed:
 
 ```bash
 git clone git@github.com:tareqsifat/klassy_missy_code_assesment.git
-cd coding_assesment_klassy_missy
+cd klassy_missy_code_assesment
 ```
 
 ### 2. Start Redis Server
