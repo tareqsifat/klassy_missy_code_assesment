@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 interface UseCountdownResult {
   timeLeft: number;
@@ -9,7 +9,15 @@ interface UseCountdownResult {
 }
 
 export function useCountdown(expiresAt: string): UseCountdownResult {
-  const [timeLeft, setTimeLeft] = useState<number>(0);
+  // Calculate initial time left immediately to avoid flash of "expired"
+  const initialTimeLeft = useMemo(() => {
+    const now = new Date().getTime();
+    const expiration = new Date(expiresAt).getTime();
+    const difference = expiration - now;
+    return Math.max(0, Math.floor(difference / 1000));
+  }, [expiresAt]);
+
+  const [timeLeft, setTimeLeft] = useState<number>(initialTimeLeft);
 
   useEffect(() => {
     const calculateTimeLeft = () => {
@@ -19,6 +27,7 @@ export function useCountdown(expiresAt: string): UseCountdownResult {
       return Math.max(0, Math.floor(difference / 1000));
     };
 
+    // Set initial value
     setTimeLeft(calculateTimeLeft());
 
     const interval = setInterval(() => {

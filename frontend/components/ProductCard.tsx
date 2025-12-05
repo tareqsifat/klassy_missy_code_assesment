@@ -54,7 +54,7 @@ export function ProductCard({ product, onReserve, isLoading }: ProductCardProps)
 
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <label htmlFor={`quantity-${product.id}`} className="text-sm font-medium text-gray-700 whitespace-nowrap">
+            <label htmlFor={`quantity-${product.id}`} className="text-sm font-medium text-gray-500 whitespace-nowrap">
               Quantity:
             </label>
             <select
@@ -62,7 +62,7 @@ export function ProductCard({ product, onReserve, isLoading }: ProductCardProps)
               value={quantity}
               onChange={(e) => setQuantity(Number(e.target.value))}
               disabled={isOutOfStock || reserving}
-              className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="flex-1 rounded-lg border border-black shadow-sm text-gray-500 focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
               {Array.from({ length: maxQuantity }, (_, i) => i + 1).map((num) => (
                 <option key={num} value={num}>

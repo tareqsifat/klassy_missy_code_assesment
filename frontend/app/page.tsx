@@ -42,8 +42,8 @@ export default function Home() {
   useEffect(() => {
     fetchData();
     
-    // Poll products every 3 seconds to sync stock
-    const interval = setInterval(fetchProducts, 3000);
+    // Poll products every 10 seconds to sync stock (less aggressive)
+    const interval = setInterval(fetchProducts, 10000);
     
     return () => clearInterval(interval);
   }, [fetchData, fetchProducts]);
@@ -54,7 +54,18 @@ export default function Home() {
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        setReservations(parsed);
+        // Filter out any reservations that have status ACTIVE but are past their expiration time
+        const now = new Date().getTime();
+        const validReservations = parsed.map((r: Reservation) => {
+          if (r.status === ReservationStatus.ACTIVE) {
+            const expiration = new Date(r.expiresAt).getTime();
+            if (expiration < now) {
+              return { ...r, status: ReservationStatus.EXPIRED };
+            }
+          }
+          return r;
+        });
+        setReservations(validReservations);
       } catch (error) {
         console.error('Failed to parse stored reservations:', error);
       }
@@ -63,9 +74,7 @@ export default function Home() {
 
   // Save reservations to localStorage whenever they change
   useEffect(() => {
-    if (reservations.length > 0) {
-      localStorage.setItem('reservations', JSON.stringify(reservations));
-    }
+    localStorage.setItem('reservations', JSON.stringify(reservations));
   }, [reservations]);
 
   const handleReserve = async (productId: number, quantity: number) => {
@@ -104,7 +113,7 @@ export default function Home() {
     }
   };
 
-  const handleExpire = (id: number) => {
+  const handleExpire = useCallback((id: number) => {
     setReservations((prev) =>
       prev.map((r) =>
         r.id === id ? { ...r, status: ReservationStatus.EXPIRED } : r
@@ -112,13 +121,17 @@ export default function Home() {
     );
     showToast('Reservation expired', 'error');
     fetchProducts(); // Refresh stock
-  };
+  }, [fetchProducts]);
 
-  const activeReservations = reservations.filter(
-    (r) => r.status === ReservationStatus.ACTIVE
-  );
+  // Filter active reservations - also check if they haven't expired based on time
+  const now = new Date().getTime();
+  const activeReservations = reservations.filter((r) => {
+    if (r.status !== ReservationStatus.ACTIVE) return false;
+    const expirationTime = new Date(r.expiresAt).getTime();
+    return expirationTime > now;
+  });
   const pastReservations = reservations.filter(
-    (r) => r.status !== ReservationStatus.ACTIVE
+    (r) => r.status !== ReservationStatus.ACTIVE || new Date(r.expiresAt).getTime() <= now
   );
 
   return (

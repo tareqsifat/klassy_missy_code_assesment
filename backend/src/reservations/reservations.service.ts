@@ -28,31 +28,33 @@ export class ReservationsService {
   async create(createReservationDto: CreateReservationDto): Promise<Reservation> {
     const { productId, quantity } = createReservationDto;
 
-    // Use transaction to ensure atomicity
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    // Check if product exists first
+    const product = await this.productsService.findOne(productId);
+    if (!product) {
+      throw new NotFoundException(`Product with ID ${productId} not found`);
+    }
 
-    try {
-      // Check if product exists
-      const product = await this.productsService.findOne(productId);
-      if (!product) {
-        throw new NotFoundException(`Product with ID ${productId} not found`);
-      }
-
-      // Attempt to decrement stock atomically
-      const stockDecremented = await this.productsService.decrementStock(
-        productId,
-        quantity,
+    // Check stock availability
+    if (product.availableStock < quantity) {
+      throw new BadRequestException(
+        `Insufficient stock. Available: ${product.availableStock}, Requested: ${quantity}`,
       );
+    }
 
-      if (!stockDecremented) {
-        throw new BadRequestException(
-          `Insufficient stock. Available: ${product.availableStock}, Requested: ${quantity}`,
-        );
-      }
+    // Attempt to decrement stock atomically (outside transaction for atomicity)
+    const stockDecremented = await this.productsService.decrementStock(
+      productId,
+      quantity,
+    );
 
-      // Create reservation
+    if (!stockDecremented) {
+      throw new BadRequestException(
+        `Insufficient stock. The item may have been reserved by someone else.`,
+      );
+    }
+
+    // Create reservation - stock already decremented
+    try {
       const expiresAt = new Date(Date.now() + this.RESERVATION_DURATION_MS);
       const reservation = this.reservationsRepository.create({
         productId,
@@ -61,7 +63,7 @@ export class ReservationsService {
         expiresAt,
       });
 
-      const savedReservation = await queryRunner.manager.save(reservation);
+      const savedReservation = await this.reservationsRepository.save(reservation);
 
       // Schedule expiration job
       await this.reservationsQueue.add(
@@ -70,14 +72,16 @@ export class ReservationsService {
         { delay: this.RESERVATION_DURATION_MS },
       );
 
-      await queryRunner.commitTransaction();
-
-      return savedReservation;
+      // Return with product relation for frontend display
+      const result = await this.reservationsRepository.findOne({
+        where: { id: savedReservation.id },
+        relations: ['product'],
+      });
+      return result!;
     } catch (error) {
-      await queryRunner.rollbackTransaction();
+      // If reservation creation fails, restore stock
+      await this.productsService.incrementStock(productId, quantity);
       throw error;
-    } finally {
-      await queryRunner.release();
     }
   }
 
@@ -91,6 +95,7 @@ export class ReservationsService {
     if ((result.affected ?? 0) === 0) {
       const reservation = await this.reservationsRepository.findOne({
         where: { id },
+        relations: ['product'],
       });
 
       if (!reservation) {
@@ -106,7 +111,11 @@ export class ReservationsService {
       }
     }
 
-    const updated = await this.reservationsRepository.findOne({ where: { id } });
+    // Return with product relation
+    const updated = await this.reservationsRepository.findOne({ 
+      where: { id },
+      relations: ['product'],
+    });
     if (!updated) {
        throw new NotFoundException(`Reservation with ID ${id} not found`);
     }

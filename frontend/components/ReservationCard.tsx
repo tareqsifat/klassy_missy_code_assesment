@@ -2,7 +2,7 @@
 
 import { Reservation, ReservationStatus } from '@/types';
 import { useCountdown } from '@/hooks/useCountdown';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface ReservationCardProps {
   reservation: Reservation;
@@ -18,12 +18,21 @@ export function ReservationCard({
   isCompleting 
 }: ReservationCardProps) {
   const { formattedTime, isExpired, timeLeft } = useCountdown(reservation.expiresAt);
+  const hasExpiredRef = useRef(false);
 
   useEffect(() => {
-    if (isExpired && reservation.status === ReservationStatus.ACTIVE) {
-      onExpire(reservation.id);
+    // Only call onExpire once when it transitions from active to expired
+    // Don't call if it was already expired when we first saw it
+    if (isExpired && reservation.status === ReservationStatus.ACTIVE && !hasExpiredRef.current) {
+      // Check if we have a valid timeLeft calculation (not just initial state)
+      const now = new Date().getTime();
+      const expiration = new Date(reservation.expiresAt).getTime();
+      if (expiration < now) {
+        hasExpiredRef.current = true;
+        onExpire(reservation.id);
+      }
     }
-  }, [isExpired, reservation.status, reservation.id, onExpire]);
+  }, [isExpired, reservation.status, reservation.id, reservation.expiresAt, onExpire]);
 
   const getStatusBadge = () => {
     switch (reservation.status) {
@@ -51,6 +60,10 @@ export function ReservationCard({
 
   const isActive = reservation.status === ReservationStatus.ACTIVE && !isExpired;
   const showTimer = reservation.status === ReservationStatus.ACTIVE;
+
+  // Debug log to see the entire reservation object
+  console.log("Reservation data:", JSON.stringify(reservation, null, 2));
+  console.log("Product:", reservation);
 
   return (
     <div className={`bg-white rounded-xl shadow-md p-5 border-l-4 transition-all duration-300 ${
